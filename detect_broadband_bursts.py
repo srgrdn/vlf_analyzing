@@ -56,6 +56,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cmap", default="jet", help="Colormap for the spectrogram panel. Default: jet")
     parser.add_argument("--db-low", type=float, default=2.0, help="Lower percentile for spectrogram dB clipping.")
     parser.add_argument("--db-high", type=float, default=99.8, help="Upper percentile for spectrogram dB clipping.")
+    parser.add_argument("--mark-span", type=float, default=0.006, help="Highlight width around each detection in seconds. Default: 0.006")
+    parser.add_argument("--mark-alpha", type=float, default=0.18, help="Highlight alpha for detection spans. Default: 0.18")
     parser.add_argument("--dpi", type=int, default=160, help="Output image DPI.")
     return parser.parse_args()
 
@@ -176,6 +178,8 @@ def render_detection_plot(
     cmap: str,
     db_low: float,
     db_high: float,
+    mark_span: float,
+    mark_alpha: float,
     dpi: int,
     show: bool,
 ) -> None:
@@ -199,13 +203,22 @@ def render_detection_plot(
         interpolation="nearest",
     )
     if peak_indices.size:
+        half_span = mark_span / 2.0
+        for peak_time in time_s[peak_indices]:
+            ax_spec.axvspan(
+                peak_time - half_span,
+                peak_time + half_span,
+                color="white",
+                alpha=mark_alpha,
+                linewidth=0,
+            )
         ax_spec.vlines(
             time_s[peak_indices],
             ymin=freq_hz[0],
             ymax=freq_hz[-1],
             color="white",
             linewidth=1.0,
-            alpha=0.9,
+            alpha=min(1.0, mark_alpha + 0.55),
         )
     ax_spec.set_ylabel("Frequency, Hz")
     ax_spec.set_title(
@@ -218,6 +231,15 @@ def render_detection_plot(
     ax_env.plot(time_s, series_db, color="#1d4ed8", linewidth=1.1, label="Band envelope")
     ax_env.axhline(threshold, color="#dc2626", linestyle="--", linewidth=1.3, label="Threshold")
     if peak_indices.size:
+        half_span = mark_span / 2.0
+        for peak_time in time_s[peak_indices]:
+            ax_env.axvspan(
+                peak_time - half_span,
+                peak_time + half_span,
+                color="#f59e0b",
+                alpha=mark_alpha,
+                linewidth=0,
+            )
         ax_env.scatter(
             time_s[peak_indices],
             series_db[peak_indices],
@@ -355,6 +377,8 @@ def main() -> None:
             cmap=args.cmap,
             db_low=args.db_low,
             db_high=args.db_high,
+            mark_span=args.mark_span,
+            mark_alpha=args.mark_alpha,
             dpi=args.dpi,
             show=args.show,
         )
@@ -393,6 +417,7 @@ def main() -> None:
     print(f"Aggregate         : {args.aggregate}")
     print(f"Threshold MAD     : {args.threshold_mad}")
     print(f"Min peak dist, s  : {args.min_peak_distance}")
+    print(f"Mark span, s      : {args.mark_span}")
     print(f"Output base       : {base_output if base_output is not None else 'not saved'}")
     print(f"CSV output        : {csv_output if csv_output is not None else 'not saved'}")
 
