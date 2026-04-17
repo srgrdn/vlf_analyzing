@@ -28,14 +28,18 @@ def parse_args() -> argparse.Namespace:
             "frequency band and applying a robust peak threshold."
         )
     )
-    parser.add_argument("input", type=Path, help="Path to Broadband_Data_*.bin")
+    parser.add_argument("input", type=Path, help="Path to Broadband_Data_*.bin or a directory with .bin files")
     parser.add_argument(
         "-o",
         "--output",
         type=Path,
         default=None,
-        help="Base PNG path for saved segment plots. Default: <input>_burst_detection.png",
+        help=(
+            "Base PNG path for a single file, or output directory for directory mode. "
+            "Default: next to each input file."
+        ),
     )
+    parser.add_argument("--recursive", action="store_true", help="Recursively scan subdirectories in directory mode.")
     parser.add_argument("--show", action="store_true", help="Display plots in a window.")
     parser.add_argument("--no-save", action="store_true", help="Do not save PNG or CSV results.")
     parser.add_argument("--sample-rate", type=float, default=100000.0, help="Per-channel sample rate in Hz.")
@@ -48,7 +52,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--channel-index", type=int, default=None, help="Zero-based channel index override.")
     parser.add_argument("--freq-min", type=float, required=True, help="Lower frequency bound in Hz.")
     parser.add_argument("--freq-max", type=float, required=True, help="Upper frequency bound in Hz.")
-    parser.add_argument("--segment-duration", type=float, default=2.0, help="Segment duration in seconds.")
+    parser.add_argument(
+        "--segment-duration",
+        type=float,
+        default=None,
+        help="Segment duration in seconds. If omitted, the whole file is processed as one segment.",
+    )
     parser.add_argument("--aggregate", choices=("mean", "sum", "max"), default="mean", help="How to collapse the selected band across frequency.")
     parser.add_argument("--threshold-mad", type=float, default=6.0, help="Threshold = median + K * robust_sigma, where robust_sigma = 1.4826 * MAD.")
     parser.add_argument("--min-peak-distance", type=float, default=0.01, help="Minimum spacing between detections in seconds.")
@@ -148,6 +157,35 @@ def resolve_output_base(input_path: Path, output: Path | None, save_enabled: boo
     if output is not None:
         return output.resolve()
     return input_path.with_name(f"{input_path.stem}_burst_detection.png")
+
+
+def collect_input_files(input_path: Path, recursive: bool) -> list[Path]:
+    if input_path.is_file():
+        return [input_path]
+    if not input_path.is_dir():
+        raise ValueError(f"Input path does not exist: {input_path}")
+
+    iterator = input_path.rglob("*.bin") if recursive else input_path.glob("*.bin")
+    files = sorted(path for path in iterator if path.is_file())
+    if not files:
+        raise ValueError(f"No .bin files found in {input_path}")
+    return files
+
+
+def resolve_directory_output_base(
+    file_path: Path, input_root: Path, output: Path | None, save_enabled: bool
+) -> Path | None:
+    if not save_enabled:
+        return None
+
+    if output is None:
+        return file_path.with_name(f"{file_path.stem}_burst_detection.png")
+
+    output_root = output.resolve()
+    relative_parent = file_path.parent.relative_to(input_root)
+    target_dir = output_root / relative_parent
+    target_dir.mkdir(parents=True, exist_ok=True)
+    return target_dir / f"{file_path.stem}_burst_detection.png"
 
 
 def resolve_segment_output(base: Path | None, segment_index: int, start_s: float, stop_s: float) -> Path | None:
@@ -295,15 +333,14 @@ def write_detections_csv(rows: list[dict[str, object]], output_path: Path) -> Pa
     raise last_error
 
 
-def main() -> None:
-    args = parse_args()
-    if args.no_save and not args.show:
-        raise ValueError("Nothing to do: use --show, or omit --no-save to save results.")
-
-    input_path = args.input.expanduser().resolve()
-    selected_channel, channel_index = resolve_channel(args)
-    plt = configure_matplotlib(show=args.show)
-
+def process_file(
+    args: argparse.Namespace,
+    plt,
+    input_path: Path,
+    selected_channel: str,
+    channel_index: int,
+    base_output: Path | None,
+) -> tuple[int, Path | None]:
     record_size, sample_count, data_offset = read_metadata(input_path)
     samples = load_samples(input_path, sample_count, record_size, data_offset)
     channel_samples = extract_channel(
@@ -330,7 +367,6 @@ def main() -> None:
         nperseg=nperseg,
     )
 
-    base_output = resolve_output_base(input_path, args.output, save_enabled=not args.no_save)
     detection_rows: list[dict[str, object]] = []
     min_distance_bins = max(1, int(round(args.min_peak_distance * args.sample_rate / hop)))
 
@@ -397,7 +433,7 @@ def main() -> None:
             )
 
         print(
-            f"Segment {segment_index + 1:02d}/{len(segments)} "
+            f"{input_path.name} | segment {segment_index + 1:02d}/{len(segments)} "
             f"{start_s:.3f}-{stop_s:.3f} s: detections={len(peak_indices)} "
             f"threshold={threshold:.2f} dB"
         )
@@ -420,6 +456,44 @@ def main() -> None:
     print(f"Mark span, s      : {args.mark_span}")
     print(f"Output base       : {base_output if base_output is not None else 'not saved'}")
     print(f"CSV output        : {csv_output if csv_output is not None else 'not saved'}")
+    return len(detection_rows), csv_output
+
+
+def main() -> None:
+    args = parse_args()
+    if args.no_save and not args.show:
+        raise ValueError("Nothing to do: use --show, or omit --no-save to save results.")
+
+    input_path = args.input.expanduser().resolve()
+    selected_channel, channel_index = resolve_channel(args)
+    plt = configure_matplotlib(show=args.show)
+    input_files = collect_input_files(input_path, recursive=args.recursive)
+
+    total_detections = 0
+    for file_path in input_files:
+        if input_path.is_dir():
+            base_output = resolve_directory_output_base(
+                file_path=file_path,
+                input_root=input_path,
+                output=args.output,
+                save_enabled=not args.no_save,
+            )
+        else:
+            base_output = resolve_output_base(file_path, args.output, save_enabled=not args.no_save)
+
+        file_detections, _ = process_file(
+            args=args,
+            plt=plt,
+            input_path=file_path,
+            selected_channel=selected_channel,
+            channel_index=channel_index,
+            base_output=base_output,
+        )
+        total_detections += file_detections
+
+    if len(input_files) > 1:
+        print(f"Processed files   : {len(input_files)}")
+        print(f"All detections    : {total_detections}")
 
 
 if __name__ == "__main__":
