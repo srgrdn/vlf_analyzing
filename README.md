@@ -1,14 +1,23 @@
 # Broadband Data Tools
 
-Набор утилит для разбора и визуализации бинарных записей `Broadband_Data_*.bin`, построения спектрограмм и осциллограмм, детектирования всплесков в выбранной полосе, а также прогона изображений через готовую модель классификации вистлеров.
+Набор утилит для разбора бинарных записей `Broadband_Data_*.bin`, построения спектрограмм и осциллограмм, детектирования широкополосных всплесков и автоматического мониторинга директории с сырыми минутными файлами.
 
-## Что лежит в папке
+Основной сценарий проекта сейчас такой:
 
-- `Broadband_Data_2026.03.25_16.31.00.bin` — пример исходного бинарного файла.
+- в папку `raw_data/` попадают минутные бинарные файлы;
+- `monitor_raw_data.py` постоянно следит за этой папкой;
+- как только файл перестает расти, монитор запускает `detect_broadband_bursts.py`;
+- если всплесков нет, файл можно удалить или перенести;
+- если всплески есть, файл сохраняется.
+
+## Что лежит в репозитории
+
 - `plot_broadband_spectrogram.py` — построение спектрограмм по одному каналу `ns` или `we`.
 - `plot_broadband_oscillogram.py` — построение осциллограммы в `dBFS`.
 - `detect_broadband_bursts.py` — детектор всплесков по огибающей мощности в выбранной полосе.
+- `monitor_raw_data.py` — постоянный монитор директории, который вызывает детектор для новых файлов.
 - `run_whistler_classifier.py` — прогон PNG/JPG изображений через обученную модель `whistler_classify_hq.h5`.
+- `Broadband_Data_2026.03.25_16.31.00.bin` — пример исходного бинарного файла.
 
 ## Формат данных
 
@@ -24,7 +33,7 @@
 
 ## Требования
 
-Для спектрограмм, осциллограмм и детектора всплесков:
+Для спектрограмм, осциллограмм, детектора и монитора:
 
 - Python 3
 - `numpy`
@@ -35,7 +44,7 @@
 - `tensorflow`
 - `pillow`
 
-Классификатор рассчитан на ту же модель, что использует ноутбук:
+Классификатор рассчитан на модель:
 
 - `../models/whistler_classify_hq.h5`
 
@@ -77,7 +86,7 @@ python3 plot_broadband_oscillogram.py Broadband_Data_2026.03.25_16.31.00.bin \
 
 ### 3. Детектор всплесков
 
-Построить по сегментам совмещённый график `спектрограмма + огибающая + порог + срабатывания`:
+Ручной запуск с графиками по сегментам:
 
 ```bash
 python3 detect_broadband_bursts.py Broadband_Data_2026.03.25_16.31.00.bin \
@@ -93,6 +102,44 @@ python3 detect_broadband_bursts.py Broadband_Data_2026.03.25_16.31.00.bin \
   --show
 ```
 
+Запуск на весь минутный файл без графического окна:
+
+```bash
+python3 detect_broadband_bursts.py Broadband_Data_2026.03.25_16.31.00.bin \
+  --channel ns \
+  --freq-min 20000 \
+  --freq-max 30000 \
+  --segment-duration 60 \
+  --time-resolution 0.002 \
+  --frequency-resolution 50 \
+  --threshold-mad 8 \
+  --mark-span 0.01
+```
+
+Автоматический режим для монитора, когда не нужны ни PNG, ни CSV, ни GUI:
+
+```bash
+python3 detect_broadband_bursts.py Broadband_Data_2026.03.25_16.31.00.bin \
+  --channel ns \
+  --freq-min 20000 \
+  --freq-max 30000 \
+  --segment-duration 60 \
+  --time-resolution 0.002 \
+  --frequency-resolution 50 \
+  --threshold-mad 8 \
+  --mark-span 0.01 \
+  --no-save \
+  --allow-no-output
+```
+
+В конце автоматического запуска скрипт печатает строку вида:
+
+```text
+TOTAL_DETECTIONS=3
+```
+
+Именно ее использует монитор, чтобы понять, оставлять файл или нет.
+
 Полезные параметры детектора:
 
 - `--aggregate mean|sum|max` — как сворачивать спектр по частоте.
@@ -100,13 +147,224 @@ python3 detect_broadband_bursts.py Broadband_Data_2026.03.25_16.31.00.bin \
 - `--min-peak-distance` — минимальная дистанция между детекциями в секундах.
 - `--mark-span` — ширина подсвеченного окна вокруг детекции.
 - `--mark-alpha` — прозрачность подсветки.
+- `--no-save --allow-no-output` — режим для автоматизации без файлового и графического вывода.
 
-Скрипт сохраняет:
+Если `--no-save` не указан, детектор сохраняет:
 
 - PNG по каждому сегменту;
 - CSV со всеми детекциями и временами пиков.
 
-### 4. Классификация изображений
+## Монитор и детектор
+
+### Что делает монитор
+
+`monitor_raw_data.py` — это постоянный Python-процесс, который:
+
+- следит за директорией с минутными файлами;
+- ищет файлы по шаблону `Broadband_Data_*.bin`;
+- ждет, пока размер файла перестанет меняться;
+- запускает `detect_broadband_bursts.py` через `subprocess`;
+- читает `TOTAL_DETECTIONS` из вывода детектора;
+- при нуле детекций удаляет файл или переносит его в `empty/`;
+- при ошибке переносит файл в `failed/`;
+- ведет лог и сохраняет состояние.
+
+### Как монитор определяет, что файл готов
+
+Монитор не хватает файл сразу после появления. Он запоминает:
+
+- размер файла;
+- время модификации;
+- число циклов, в течение которых файл не менялся.
+
+По умолчанию файл считается готовым, если он не менялся `2` цикла подряд, а интервал между циклами `10` секунд. То есть по умолчанию файл должен быть стабильным примерно `20` секунд.
+
+Это настраивается параметрами:
+
+- `--poll-interval`
+- `--stable-cycles`
+
+### Что монитор создает на диске
+
+По умолчанию рядом с `watch-dir` он создает:
+
+- `raw_data/.monitor/monitor_state.json` — состояние уже обработанных и наблюдаемых файлов;
+- `raw_data/.monitor/monitor.log` — текстовый лог;
+- `raw_data/empty/` — файлы без детекций, если не указан `--delete-empty`;
+- `raw_data/failed/` — файлы, по которым детектор завершился с ошибкой.
+
+Опционально можно указать:
+
+- `--hits-dir` — отдельную папку для файлов, в которых детекции есть.
+
+### Жизненный цикл файла
+
+Типичный сценарий такой:
+
+1. В `raw_data/` появляется `Broadband_Data_2026.03.25_16.31.00.bin`.
+2. Монитор видит файл, но не обрабатывает его, пока он растет.
+3. Когда файл стабилен, монитор запускает детектор.
+4. Детектор анализирует весь минутный файл.
+5. Если `TOTAL_DETECTIONS=0`:
+   файл удаляется или переносится в `empty/`.
+6. Если `TOTAL_DETECTIONS>0`:
+   файл остается на месте или переносится в `hits-dir`.
+7. Если детектор падает:
+   файл переносится в `failed/`.
+
+### Почему в автоматическом режиме не нужен `--show`
+
+Параметр `--show` открывает окно `matplotlib`. Для постоянного мониторинга это неудобно:
+
+- будут всплывать окна;
+- процесс может ждать GUI;
+- это мешает фоновому режиму на Windows.
+
+Поэтому монитор всегда запускает детектор в безоконном режиме:
+
+- `--no-save`
+- `--allow-no-output`
+
+## Примеры запуска монитора
+
+### 1. Базовый режим, файлы без всплесков переносить в `empty/`
+
+```bash
+python3 monitor_raw_data.py \
+  --watch-dir raw_data \
+  --channel ns \
+  --freq-min 20000 \
+  --freq-max 30000 \
+  --segment-duration 60 \
+  --time-resolution 0.002 \
+  --frequency-resolution 50 \
+  --threshold-mad 8 \
+  --mark-span 0.01
+```
+
+Этот режим:
+
+- держит монитор постоянно запущенным;
+- оставляет файлы с детекциями на месте;
+- переносит пустые файлы в `raw_data/empty/`;
+- ошибочные файлы переносит в `raw_data/failed/`.
+
+### 2. Удалять файлы без всплесков
+
+```bash
+python3 monitor_raw_data.py \
+  --watch-dir raw_data \
+  --channel ns \
+  --freq-min 20000 \
+  --freq-max 30000 \
+  --segment-duration 60 \
+  --time-resolution 0.002 \
+  --frequency-resolution 50 \
+  --threshold-mad 8 \
+  --mark-span 0.01 \
+  --delete-empty
+```
+
+Этот режим уже удаляет файлы с нулем детекций. Для первых тестов лучше сначала не использовать его и поработать через `empty/`.
+
+### 3. Переносить полезные файлы в отдельную папку
+
+```bash
+python3 monitor_raw_data.py \
+  --watch-dir raw_data \
+  --channel ns \
+  --freq-min 20000 \
+  --freq-max 30000 \
+  --segment-duration 60 \
+  --time-resolution 0.002 \
+  --frequency-resolution 50 \
+  --threshold-mad 8 \
+  --mark-span 0.01 \
+  --hits-dir raw_data/hits
+```
+
+Тогда:
+
+- файлы с детекциями переедут в `raw_data/hits/`;
+- пустые переедут в `raw_data/empty/`;
+- ошибки переедут в `raw_data/failed/`.
+
+### 4. Медленнее сканировать директорию
+
+```bash
+python3 monitor_raw_data.py \
+  --watch-dir raw_data \
+  --poll-interval 30 \
+  --stable-cycles 2 \
+  --channel ns \
+  --freq-min 20000 \
+  --freq-max 30000 \
+  --segment-duration 60 \
+  --time-resolution 0.002 \
+  --frequency-resolution 50 \
+  --threshold-mad 8 \
+  --mark-span 0.01
+```
+
+Такой режим дает меньшую фоновую нагрузку: сканирование идет раз в `30` секунд.
+
+### 5. Ждать дольше, пока файл допишется
+
+```bash
+python3 monitor_raw_data.py \
+  --watch-dir raw_data \
+  --poll-interval 10 \
+  --stable-cycles 4 \
+  --channel ns \
+  --freq-min 20000 \
+  --freq-max 30000 \
+  --segment-duration 60 \
+  --time-resolution 0.002 \
+  --frequency-resolution 50 \
+  --threshold-mad 8 \
+  --mark-span 0.01
+```
+
+Здесь файл должен быть неизменным примерно `40` секунд, прежде чем начнется анализ.
+
+## Пример для Windows 7
+
+Если Python установлен и доступен как `python`, базовая команда будет такой:
+
+```bat
+python monitor_raw_data.py --watch-dir raw_data --channel ns --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01
+```
+
+Если нужен режим с удалением пустых файлов:
+
+```bat
+python monitor_raw_data.py --watch-dir raw_data --channel ns --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01 --delete-empty
+```
+
+Пример простого `.bat`-файла:
+
+```bat
+@echo off
+cd /d C:\path\to\vlf_analyzing
+python monitor_raw_data.py --watch-dir raw_data --channel ns --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01
+pause
+```
+
+Если монитор должен работать долго, лучше запускать его в отдельном окне `cmd` или через ярлык на этот `.bat`.
+
+## Что смотреть при отладке
+
+Если монитор не обрабатывает файлы, в первую очередь проверь:
+
+- появляется ли файл в `watch-dir`;
+- перестает ли он реально меняться по размеру;
+- нет ли его уже в `monitor_state.json`;
+- не уехал ли он в `failed/`;
+- что написано в `raw_data/.monitor/monitor.log`.
+
+Если детектор работает вручную, но монитор отправляет файл в `failed/`, полезно вручную выполнить ту же команду, что запускает монитор, только в консоли.
+
+## Классификация изображений
 
 Один файл:
 
@@ -130,12 +388,14 @@ python run_whistler_classifier.py ./images --recursive
 
 ## Замечания по окружению
 
-- `plot_broadband_spectrogram.py`, `plot_broadband_oscillogram.py` и `detect_broadband_bursts.py` нормально работают в обычном Linux/WSL Python.
-- `run_whistler_classifier.py` требует окружение с TensorFlow. Если в текущем интерпретаторе TensorFlow не установлен, скрипт завершится с подсказкой использовать то же окружение, что и ноутбук.
+- `plot_broadband_spectrogram.py`, `plot_broadband_oscillogram.py`, `detect_broadband_bursts.py` и `monitor_raw_data.py` работают в обычном Python без TensorFlow.
+- `run_whistler_classifier.py` требует окружение с TensorFlow.
+- Для автоматического мониторинга лучше не использовать `--show`.
 
 ## Полезные идеи для развития
 
-- добавить автоматическое выделение начала и конца события, а не только центра пика;
+- сохранить для монитора отдельный JSON-отчет по каждому файлу;
+- добавить опцию повторной обработки файлов из `failed/`;
+- добавить режим пакетного прогона без постоянного цикла;
 - добавить экспорт детекций в формат для последующей ручной разметки;
-- добавить пакетный прогон бинарных файлов из директории;
 - добавить сравнение каналов `ns/we` на одном графике.

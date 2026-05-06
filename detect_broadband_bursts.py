@@ -38,6 +38,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--show", action="store_true", help="Display plots in a window.")
     parser.add_argument("--no-save", action="store_true", help="Do not save PNG or CSV results.")
+    parser.add_argument(
+        "--allow-no-output",
+        action="store_true",
+        help="Allow analysis without plots, CSV, or GUI output. Useful for automation.",
+    )
     parser.add_argument("--sample-rate", type=float, default=100000.0, help="Per-channel sample rate in Hz.")
     parser.add_argument("--nperseg", type=int, default=4096, help="FFT window length for manual mode.")
     parser.add_argument("--time-resolution", type=float, default=0.002, help="Target time step in seconds.")
@@ -297,12 +302,13 @@ def write_detections_csv(rows: list[dict[str, object]], output_path: Path) -> Pa
 
 def main() -> None:
     args = parse_args()
-    if args.no_save and not args.show:
+    if args.no_save and not args.show and not args.allow_no_output:
         raise ValueError("Nothing to do: use --show, or omit --no-save to save results.")
 
     input_path = args.input.expanduser().resolve()
     selected_channel, channel_index = resolve_channel(args)
-    plt = configure_matplotlib(show=args.show)
+    render_outputs = args.show or not args.no_save
+    plt = configure_matplotlib(show=args.show) if render_outputs else None
 
     record_size, sample_count, data_offset = read_metadata(input_path)
     samples = load_samples(input_path, sample_count, record_size, data_offset)
@@ -359,29 +365,30 @@ def main() -> None:
         segment_label = f"segment {segment_index + 1}/{len(segments)}: {start_s:.3f}-{stop_s:.3f} s"
         segment_output = resolve_segment_output(base_output, segment_index, start_s, stop_s)
 
-        render_detection_plot(
-            plt=plt,
-            spec_db=spec_db,
-            time_s=global_time_s,
-            freq_hz=freq_hz,
-            series_db=series_db,
-            threshold=threshold,
-            peak_indices=peak_indices,
-            output=segment_output,
-            input_path=input_path,
-            channel_name=selected_channel,
-            freq_min=freq_min,
-            freq_max=freq_max,
-            segment_label=segment_label,
-            aggregate=args.aggregate,
-            cmap=args.cmap,
-            db_low=args.db_low,
-            db_high=args.db_high,
-            mark_span=args.mark_span,
-            mark_alpha=args.mark_alpha,
-            dpi=args.dpi,
-            show=args.show,
-        )
+        if render_outputs:
+            render_detection_plot(
+                plt=plt,
+                spec_db=spec_db,
+                time_s=global_time_s,
+                freq_hz=freq_hz,
+                series_db=series_db,
+                threshold=threshold,
+                peak_indices=peak_indices,
+                output=segment_output,
+                input_path=input_path,
+                channel_name=selected_channel,
+                freq_min=freq_min,
+                freq_max=freq_max,
+                segment_label=segment_label,
+                aggregate=args.aggregate,
+                cmap=args.cmap,
+                db_low=args.db_low,
+                db_high=args.db_high,
+                mark_span=args.mark_span,
+                mark_alpha=args.mark_alpha,
+                dpi=args.dpi,
+                show=args.show,
+            )
 
         for idx in peak_indices:
             detection_rows.append(
@@ -420,6 +427,7 @@ def main() -> None:
     print(f"Mark span, s      : {args.mark_span}")
     print(f"Output base       : {base_output if base_output is not None else 'not saved'}")
     print(f"CSV output        : {csv_output if csv_output is not None else 'not saved'}")
+    print(f"TOTAL_DETECTIONS={len(detection_rows)}")
 
 
 if __name__ == "__main__":
