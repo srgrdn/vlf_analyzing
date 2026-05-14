@@ -46,6 +46,7 @@ class MonitorConfig:
     empty_dir: Path | None
     processing1_dir: Path
     processing2_dir: Path
+    use_processing2: bool
     failed_dir: Path | None
     detector_timeout: float | None
     file_pattern: str
@@ -148,6 +149,11 @@ def parse_args() -> argparse.Namespace:
         help="Directory for non-empty files used in the whistler pipeline. Default: sibling ./processing2",
     )
     parser.add_argument(
+        "--disable-processing2",
+        action="store_true",
+        help="Do not create or use processing2. Non-empty files will only be moved to processing1.",
+    )
+    parser.add_argument(
         "--failed-dir",
         type=Path,
         default=None,
@@ -201,6 +207,7 @@ def build_config(args: argparse.Namespace) -> MonitorConfig:
         empty_dir=empty_dir,
         processing1_dir=processing1_dir,
         processing2_dir=processing2_dir,
+        use_processing2=not args.disable_processing2,
         failed_dir=failed_dir,
         detector_timeout=args.detector_timeout,
         file_pattern=args.file_pattern,
@@ -214,7 +221,8 @@ def ensure_runtime_dirs(config: MonitorConfig) -> None:
     if config.empty_dir is not None:
         config.empty_dir.mkdir(parents=True, exist_ok=True)
     config.processing1_dir.mkdir(parents=True, exist_ok=True)
-    config.processing2_dir.mkdir(parents=True, exist_ok=True)
+    if config.use_processing2:
+        config.processing2_dir.mkdir(parents=True, exist_ok=True)
     if config.failed_dir is not None:
         config.failed_dir.mkdir(parents=True, exist_ok=True)
 
@@ -369,8 +377,11 @@ def finalize_file(
         processing1_path = unique_destination(config.processing1_dir, source.name)
         source.replace(processing1_path)
 
-        processing2_path = unique_destination(config.processing2_dir, source.name)
-        shutil.copy2(processing1_path, processing2_path)
+        processing2_path = ""
+        if config.use_processing2:
+            destination = unique_destination(config.processing2_dir, source.name)
+            shutil.copy2(processing1_path, destination)
+            processing2_path = str(destination)
 
         dominant_channel = max(
             summaries,
@@ -380,7 +391,7 @@ def finalize_file(
             "status": "routed",
             "final_path": str(processing1_path),
             "processing1_path": str(processing1_path),
-            "processing2_path": str(processing2_path),
+            "processing2_path": processing2_path,
             "dominant_channel": dominant_channel,
         }
 
