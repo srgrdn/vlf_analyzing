@@ -138,7 +138,13 @@ python3 detect_broadband_bursts.py Broadband_Data_2026.03.25_16.31.00.bin \
 TOTAL_DETECTIONS=3
 ```
 
-Именно ее использует монитор, чтобы понять, оставлять файл или нет.
+И дополнительно печатает машинно-читаемую сводку:
+
+```text
+DETECTION_SUMMARY_JSON={"channel": "ns", "total_detections": 3, ...}
+```
+
+Именно эту JSON-сводку использует монитор.
 
 Полезные параметры детектора:
 
@@ -163,9 +169,11 @@ TOTAL_DETECTIONS=3
 - следит за директорией с минутными файлами;
 - ищет файлы по шаблону `Broadband_Data_*.bin`;
 - ждет, пока размер файла перестанет меняться;
-- запускает `detect_broadband_bursts.py` через `subprocess`;
-- читает `TOTAL_DETECTIONS` из вывода детектора;
-- при нуле детекций удаляет файл или переносит его в `empty/`;
+- запускает `detect_broadband_bursts.py` два раза для каждого файла: по `ns` и по `we`;
+- читает JSON-сводку по каждому каналу;
+- пишет таблицу по каналам и сводную таблицу по минутным файлам;
+- при нуле детекций по обоим каналам удаляет файл или переносит его в `empty/`;
+- если детекции есть, переносит файл в `processing1/` и копирует в `processing2/`;
 - при ошибке переносит файл в `failed/`;
 - ведет лог и сохраняет состояние.
 
@@ -190,12 +198,14 @@ TOTAL_DETECTIONS=3
 
 - `raw_data/.monitor/monitor_state.json` — состояние уже обработанных и наблюдаемых файлов;
 - `raw_data/.monitor/monitor.log` — текстовый лог;
-- `raw_data/empty/` — файлы без детекций, если не указан `--delete-empty`;
-- `raw_data/failed/` — файлы, по которым детектор завершился с ошибкой.
+- `reports/sferics_per_channel.csv` — одна строка на файл и канал;
+- `reports/sferics_summary.csv` — одна строка на минутный файл;
+- `empty/` — пустые файлы, если не указан `--delete-empty`;
+- `processing1/` — непустые файлы для пайплайна сфериков;
+- `processing2/` — копии непустых файлов для пайплайна вистлеров;
+- `failed/` — файлы, по которым детектор завершился с ошибкой.
 
-Опционально можно указать:
-
-- `--hits-dir` — отдельную папку для файлов, в которых детекции есть.
+Каталоги `empty/`, `processing1/`, `processing2/`, `failed/` и `reports/` по умолчанию создаются рядом с `raw_data/`, то есть как соседние директории.
 
 ### Жизненный цикл файла
 
@@ -203,12 +213,12 @@ TOTAL_DETECTIONS=3
 
 1. В `raw_data/` появляется `Broadband_Data_2026.03.25_16.31.00.bin`.
 2. Монитор видит файл, но не обрабатывает его, пока он растет.
-3. Когда файл стабилен, монитор запускает детектор.
-4. Детектор анализирует весь минутный файл.
-5. Если `TOTAL_DETECTIONS=0`:
+3. Когда файл стабилен, монитор запускает детектор для `ns` и `we`.
+4. Детектор анализирует весь минутный файл в полосе `20-30 кГц`.
+5. Если по обоим каналам `TOTAL_DETECTIONS=0`:
    файл удаляется или переносится в `empty/`.
-6. Если `TOTAL_DETECTIONS>0`:
-   файл остается на месте или переносится в `hits-dir`.
+6. Если хотя бы по одному каналу детекции есть:
+   файл переносится в `processing1/` и копируется в `processing2/`.
 7. Если детектор падает:
    файл переносится в `failed/`.
 
@@ -227,12 +237,19 @@ TOTAL_DETECTIONS=3
 
 ## Примеры запуска монитора
 
-### 1. Базовый режим, файлы без всплесков переносить в `empty/`
+### 1. Базовый режим
+
+Монитор:
+
+- анализирует оба канала `ns` и `we`;
+- пишет CSV-отчеты в `reports/`;
+- переносит пустые файлы в `empty/`;
+- переносит непустые файлы в `processing1/`;
+- копирует непустые файлы в `processing2/`.
 
 ```bash
 python3 monitor_raw_data.py \
   --watch-dir raw_data \
-  --channel ns \
   --freq-min 20000 \
   --freq-max 30000 \
   --segment-duration 60 \
@@ -242,19 +259,11 @@ python3 monitor_raw_data.py \
   --mark-span 0.01
 ```
 
-Этот режим:
-
-- держит монитор постоянно запущенным;
-- оставляет файлы с детекциями на месте;
-- переносит пустые файлы в `raw_data/empty/`;
-- ошибочные файлы переносит в `raw_data/failed/`.
-
 ### 2. Удалять файлы без всплесков
 
 ```bash
 python3 monitor_raw_data.py \
   --watch-dir raw_data \
-  --channel ns \
   --freq-min 20000 \
   --freq-max 30000 \
   --segment-duration 60 \
@@ -267,12 +276,11 @@ python3 monitor_raw_data.py \
 
 Этот режим уже удаляет файлы с нулем детекций. Для первых тестов лучше сначала не использовать его и поработать через `empty/`.
 
-### 3. Переносить полезные файлы в отдельную папку
+### 3. Поменять директории для пайплайнов сфериков и вистлеров
 
 ```bash
 python3 monitor_raw_data.py \
   --watch-dir raw_data \
-  --channel ns \
   --freq-min 20000 \
   --freq-max 30000 \
   --segment-duration 60 \
@@ -280,14 +288,16 @@ python3 monitor_raw_data.py \
   --frequency-resolution 50 \
   --threshold-mad 8 \
   --mark-span 0.01 \
-  --hits-dir raw_data/hits
+  --processing1-dir D:/data/processing1 \
+  --processing2-dir D:/data/processing2
 ```
 
 Тогда:
 
-- файлы с детекциями переедут в `raw_data/hits/`;
-- пустые переедут в `raw_data/empty/`;
-- ошибки переедут в `raw_data/failed/`.
+- непустые файлы переедут в `D:/data/processing1`;
+- их копии появятся в `D:/data/processing2`;
+- пустые по-прежнему уйдут в `empty/`;
+- ошибки уйдут в `failed/`.
 
 ### 4. Медленнее сканировать директорию
 
@@ -296,7 +306,6 @@ python3 monitor_raw_data.py \
   --watch-dir raw_data \
   --poll-interval 30 \
   --stable-cycles 2 \
-  --channel ns \
   --freq-min 20000 \
   --freq-max 30000 \
   --segment-duration 60 \
@@ -315,7 +324,6 @@ python3 monitor_raw_data.py \
   --watch-dir raw_data \
   --poll-interval 10 \
   --stable-cycles 4 \
-  --channel ns \
   --freq-min 20000 \
   --freq-max 30000 \
   --segment-duration 60 \
@@ -332,13 +340,13 @@ python3 monitor_raw_data.py \
 Если Python установлен и доступен как `python`, базовая команда будет такой:
 
 ```bat
-python monitor_raw_data.py --watch-dir raw_data --channel ns --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01
+python monitor_raw_data.py --watch-dir raw_data --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01
 ```
 
 Если нужен режим с удалением пустых файлов:
 
 ```bat
-python monitor_raw_data.py --watch-dir raw_data --channel ns --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01 --delete-empty
+python monitor_raw_data.py --watch-dir raw_data --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01 --delete-empty
 ```
 
 Пример простого `.bat`-файла:
@@ -346,7 +354,7 @@ python monitor_raw_data.py --watch-dir raw_data --channel ns --freq-min 20000 --
 ```bat
 @echo off
 cd /d C:\path\to\vlf_analyzing
-python monitor_raw_data.py --watch-dir raw_data --channel ns --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01
+python monitor_raw_data.py --watch-dir raw_data --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01
 pause
 ```
 
@@ -359,6 +367,7 @@ pause
 - появляется ли файл в `watch-dir`;
 - перестает ли он реально меняться по размеру;
 - нет ли его уже в `monitor_state.json`;
+- появились ли строки в `reports/sferics_per_channel.csv` и `reports/sferics_summary.csv`;
 - не уехал ли он в `failed/`;
 - что написано в `raw_data/.monitor/monitor.log`.
 

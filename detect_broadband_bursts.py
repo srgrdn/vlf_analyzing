@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
@@ -19,6 +21,23 @@ from plot_broadband_spectrogram import (
     resolve_frequency_band,
     resolve_stft_parameters,
 )
+
+
+@dataclass
+class DetectionSummary:
+    input_file: str
+    channel: str
+    channel_index: int
+    freq_min_hz: float
+    freq_max_hz: float
+    segment_duration_s: float | None
+    total_detections: int
+    max_peak_db: float | None
+    mean_peak_db: float | None
+    median_peak_db: float | None
+    sample_rate_hz: float
+    time_step_s: float
+    freq_step_hz: float
 
 
 def parse_args() -> argparse.Namespace:
@@ -300,6 +319,48 @@ def write_detections_csv(rows: list[dict[str, object]], output_path: Path) -> Pa
     raise last_error
 
 
+def build_summary(
+    input_path: Path,
+    channel_name: str,
+    channel_index: int,
+    freq_min: float,
+    freq_max: float,
+    segment_duration: float | None,
+    sample_rate: float,
+    hop: int,
+    nperseg: int,
+    detection_rows: list[dict[str, object]],
+) -> DetectionSummary:
+    peak_values = np.asarray(
+        [float(row["peak_db"]) for row in detection_rows],
+        dtype=np.float32,
+    )
+    if peak_values.size:
+        max_peak_db = float(np.max(peak_values))
+        mean_peak_db = float(np.mean(peak_values))
+        median_peak_db = float(np.median(peak_values))
+    else:
+        max_peak_db = None
+        mean_peak_db = None
+        median_peak_db = None
+
+    return DetectionSummary(
+        input_file=str(input_path),
+        channel=channel_name,
+        channel_index=channel_index,
+        freq_min_hz=float(freq_min),
+        freq_max_hz=float(freq_max),
+        segment_duration_s=None if segment_duration is None else float(segment_duration),
+        total_detections=len(detection_rows),
+        max_peak_db=max_peak_db,
+        mean_peak_db=mean_peak_db,
+        median_peak_db=median_peak_db,
+        sample_rate_hz=float(sample_rate),
+        time_step_s=float(hop / sample_rate),
+        freq_step_hz=float(sample_rate / nperseg),
+    )
+
+
 def main() -> None:
     args = parse_args()
     if args.no_save and not args.show and not args.allow_no_output:
@@ -427,7 +488,20 @@ def main() -> None:
     print(f"Mark span, s      : {args.mark_span}")
     print(f"Output base       : {base_output if base_output is not None else 'not saved'}")
     print(f"CSV output        : {csv_output if csv_output is not None else 'not saved'}")
-    print(f"TOTAL_DETECTIONS={len(detection_rows)}")
+    summary = build_summary(
+        input_path=input_path,
+        channel_name=selected_channel,
+        channel_index=channel_index,
+        freq_min=freq_min,
+        freq_max=freq_max,
+        segment_duration=args.segment_duration,
+        sample_rate=args.sample_rate,
+        hop=hop,
+        nperseg=nperseg,
+        detection_rows=detection_rows,
+    )
+    print(f"TOTAL_DETECTIONS={summary.total_detections}")
+    print(f"DETECTION_SUMMARY_JSON={json.dumps(asdict(summary), ensure_ascii=False, sort_keys=True)}")
 
 
 if __name__ == "__main__":
