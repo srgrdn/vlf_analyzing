@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +29,7 @@ class MonitorConfig:
     reports_dir: Path
     per_channel_report: Path
     summary_report: Path
+    events_report: Path
     detector_script: Path
     python_executable: str
     poll_interval: float
@@ -190,6 +191,7 @@ def build_config(args: argparse.Namespace) -> MonitorConfig:
         reports_dir=reports_dir,
         per_channel_report=reports_dir / "sferics_per_channel.csv",
         summary_report=reports_dir / "sferics_summary.csv",
+        events_report=reports_dir / "sferics_events.csv",
         detector_script=detector_script,
         python_executable=sys.executable,
         poll_interval=args.poll_interval,
@@ -332,14 +334,21 @@ def parse_detection_summary(stdout: str) -> dict[str, Any]:
     raise ValueError("Detector output did not include DETECTION_SUMMARY_JSON line.")
 
 
-def parse_file_time(file_name: str) -> str | None:
+def parse_detection_events(stdout: str) -> list[dict[str, Any]]:
+    for line in reversed(stdout.splitlines()):
+        if line.startswith("DETECTION_EVENTS_JSON="):
+            return json.loads(line.split("=", 1)[1].strip())
+    raise ValueError("Detector output did not include DETECTION_EVENTS_JSON line.")
+
+
+def parse_file_datetime(file_name: str) -> datetime | None:
     prefix = "Broadband_Data_"
     suffix = ".bin"
     if not file_name.startswith(prefix) or not file_name.endswith(suffix):
         return None
     payload = file_name[len(prefix):-len(suffix)]
     try:
-        return datetime.strptime(payload, "%Y.%m.%d_%H.%M.%S").isoformat(sep=" ")
+        return datetime.strptime(payload, "%Y.%m.%d_%H.%M.%S")
     except ValueError:
         return None
 
@@ -427,10 +436,12 @@ def move_failed(source: Path, config: MonitorConfig) -> str:
 def write_reports(
     config: MonitorConfig,
     path: Path,
-    file_time: str | None,
+    file_dt: datetime | None,
     channel_summaries: dict[str, dict[str, Any]],
+    channel_events: dict[str, list[dict[str, Any]]],
     routing: dict[str, str],
 ) -> None:
+    file_time = file_dt.isoformat(sep=" ") if file_dt is not None else ""
     per_channel_fields = [
         "file_name",
         "file_time",
@@ -458,6 +469,43 @@ def write_reports(
                 "final_path": routing["final_path"],
             },
         )
+
+    event_fields = [
+        "file_name",
+        "file_time",
+        "channel",
+        "peak_time_local_s",
+        "peak_time_absolute",
+        "peak_time_global_s",
+        "peak_db",
+        "threshold_db",
+        "segment_index",
+        "segment_start_s",
+        "segment_stop_s",
+    ]
+    for channel_name, events in channel_events.items():
+        for event in events:
+            peak_time_absolute = ""
+            if file_dt is not None:
+                peak_dt = file_dt + timedelta(seconds=float(event["peak_time_global_s"]))
+                peak_time_absolute = peak_dt.isoformat(sep=" ")
+            append_csv_row(
+                config.events_report,
+                event_fields,
+                {
+                    "file_name": path.name,
+                    "file_time": file_time,
+                    "channel": channel_name,
+                    "peak_time_local_s": float(event["peak_time_local_s"]),
+                    "peak_time_absolute": peak_time_absolute,
+                    "peak_time_global_s": float(event["peak_time_global_s"]),
+                    "peak_db": float(event["peak_db"]),
+                    "threshold_db": float(event["threshold_db"]),
+                    "segment_index": int(event["segment_index"]),
+                    "segment_start_s": float(event["segment_start_s"]),
+                    "segment_stop_s": float(event["segment_stop_s"]),
+                },
+            )
 
     count_ns = int(channel_summaries["ns"]["total_detections"])
     count_we = int(channel_summaries["we"]["total_detections"])
@@ -501,8 +549,9 @@ def process_file(path: Path, config: MonitorConfig, state: dict[str, Any]) -> No
     key = str(path)
     state["in_progress"][key] = {"started_at": utc_now()}
     append_log(config.log_path, f"Processing {path.name}")
-    file_time = parse_file_time(path.name)
+    file_dt = parse_file_datetime(path.name)
     channel_summaries: dict[str, dict[str, Any]] = {}
+    channel_events: dict[str, list[dict[str, Any]]] = {}
 
     for channel_name in ("ns", "we"):
         command = build_detector_command(config, path, channel_name)
@@ -554,6 +603,7 @@ def process_file(path: Path, config: MonitorConfig, state: dict[str, Any]) -> No
 
         try:
             channel_summaries[channel_name] = parse_detection_summary(stdout)
+            channel_events[channel_name] = parse_detection_events(stdout)
         except Exception as exc:
             destination = move_failed(path, config) if path.exists() else ""
             state["processed"][key] = {
@@ -577,11 +627,11 @@ def process_file(path: Path, config: MonitorConfig, state: dict[str, Any]) -> No
         config=config,
         summaries=channel_summaries,
     )
-    write_reports(config, path, file_time, channel_summaries, routing)
+    write_reports(config, path, file_dt, channel_summaries, channel_events, routing)
     state["processed"][key] = {
         "status": routing["status"],
         "processed_at": utc_now(),
-        "file_time": file_time,
+        "file_time": file_dt.isoformat(sep=" ") if file_dt is not None else None,
         "count_ns": int(channel_summaries["ns"]["total_detections"]),
         "count_we": int(channel_summaries["we"]["total_detections"]),
         "count_total": total_detections,

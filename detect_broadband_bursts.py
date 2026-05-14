@@ -361,6 +361,25 @@ def build_summary(
     )
 
 
+def build_events_payload(
+    detection_rows: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    payload: list[dict[str, object]] = []
+    for row in detection_rows:
+        payload.append(
+            {
+                "segment_index": int(row["segment_index"]),
+                "segment_start_s": float(row["segment_start_s"]),
+                "segment_stop_s": float(row["segment_stop_s"]),
+                "peak_time_global_s": float(row["peak_time_global_s"]),
+                "peak_time_local_s": float(row["peak_time_local_s"]),
+                "peak_db": float(row["peak_db"]),
+                "threshold_db": float(row["threshold_db"]),
+            }
+        )
+    return payload
+
+
 def main() -> None:
     args = parse_args()
     if args.no_save and not args.show and not args.allow_no_output:
@@ -502,6 +521,10 @@ def main() -> None:
     )
     print(f"TOTAL_DETECTIONS={summary.total_detections}")
     print(f"DETECTION_SUMMARY_JSON={json.dumps(asdict(summary), ensure_ascii=False, sort_keys=True)}")
+    print(
+        "DETECTION_EVENTS_JSON="
+        f"{json.dumps(build_events_payload(detection_rows), ensure_ascii=False, sort_keys=True)}"
+    )
 
 
 if __name__ == "__main__":
