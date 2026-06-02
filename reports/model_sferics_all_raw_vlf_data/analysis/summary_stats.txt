@@ -1,0 +1,7 @@
+files: 220
+empty_files: 0
+non_empty_files: 220
+total_events: 6064
+ns_total: 1984
+we_total: 4080
+dominant_channel_counts: {'we': 173, 'ns': 39, 'equal': 8}
