@@ -165,6 +165,33 @@ python3 summarize_localization_review.py dataset_localization
 
 Скрипт только читает `manifest.csv` и `corrections.csv`: печатает количество проверенных/ожидающих примеров, распределения по статусам, каналам и bucket, а также список следующих pending-сегментов.
 
+Интерактивно разметить subset в окне `matplotlib`:
+
+```bash
+python3 review_localization_interactive.py dataset_localization
+```
+
+Горячие клавиши:
+
+- клик мышью по спектрограмме — добавить время события внутри 2-секундного сегмента;
+- `v` — принять auto-label как `manual_verified`;
+- `enter` или `c` — сохранить выбранные кликами времена как `manual_corrected`;
+- `backspace` — удалить последний клик;
+- `r` — вернуть auto-label времена;
+- `x` — очистить выбранные времена;
+- `a` — пометить `artifact_suspected`;
+- `u` — пометить `uncertain`;
+- `s` — пропустить текущий пример;
+- `q` — выйти.
+
+Скрипт сохраняет `corrections.csv` после каждого принятого примера, поэтому review можно останавливать и продолжать позже.
+
+Пересмотреть только строки с конкретным статусом:
+
+```bash
+python3 review_localization_interactive.py dataset_localization --review-status manual_corrected
+```
+
 После ручного заполнения применить правки к `metadata.csv` и `.npz`:
 
 ```bash

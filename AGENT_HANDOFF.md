@@ -22,6 +22,7 @@ Implemented:
 - `init_localization_corrections.py`
 - `apply_localization_corrections.py`
 - `summarize_localization_review.py`
+- `review_localization_interactive.py`
 
 Documented in:
 
@@ -40,11 +41,12 @@ Real outputs currently reported by the user:
 
 - `dataset_localization/metadata.csv` with `6000` rows
 - `dataset_localization/review_subset/manifest.csv` with `160` rows
+- `dataset_localization/review_subset/corrections.csv` with `160/160` reviewed rows
+- `dataset_localization/metadata.csv` now includes `85 manual_corrected` and `75 manual_verified` rows
 
-This means the next human-meaningful step is probably not another infra script, but:
+This means the review subset milestone is complete. The next human-meaningful step is:
 
-- reviewing and correcting `corrections.csv`
-- using `python3 summarize_localization_review.py dataset_localization` to track progress
+- implement train/val/test split policy for reviewed localization samples by `source_file`
 
 ## What To Check First
 
@@ -59,7 +61,7 @@ When resuming:
 
 ### Option A: Manual Review Support
 
-Good if the user wants to keep improving labels before training.
+Mostly complete for the first subset.
 
 Possible next code tasks:
 
@@ -68,7 +70,7 @@ Possible next code tasks:
 
 ### Option B: Training Skeleton
 
-Good only after a first reviewed subset exists.
+Now acceptable because the first reviewed subset exists.
 
 Likely next file:
 

@@ -189,3 +189,47 @@ Add a new item under `Progress Log` with:
   - CLI prints status/channel/bucket/quality summaries and next pending PNG paths
 - Next:
   - fill `dataset_localization/review_subset/corrections.csv`, rerun the summary, then apply corrections when reviewed rows exist
+
+### 2026-06-02 - Interactive Localization Reviewer
+
+- Step: implemented matplotlib-based interactive review workflow
+- Files: `review_localization_interactive.py`, `README.md`, `AGENT_STATUS.md`, `AGENT_HANDOFF.md`
+- Validation:
+  - `python3 -m py_compile review_localization_interactive.py summarize_localization_review.py init_localization_corrections.py apply_localization_corrections.py`
+  - `python3 review_localization_interactive.py --help`
+- Outcome:
+  - reviewer shows `.npz` spectrograms with time/frequency axes
+  - mouse clicks become corrected event times
+  - hotkeys save `manual_verified`, `manual_corrected`, `artifact_suspected`, or `uncertain` rows to `corrections.csv` after each sample
+- Next:
+  - run `python3 review_localization_interactive.py dataset_localization`, review a small batch, then validate with summary and `apply_localization_corrections.py --dry-run`
+
+### 2026-06-02 - Interactive Reviewer Click Retention Fix
+
+- Step: fixed interactive reviewer redraw behavior so mouse clicks remain selected until saved
+- Files: `review_localization_interactive.py`, `README.md`, `AGENT_STATUS.md`
+- Validation:
+  - `python3 -m py_compile review_localization_interactive.py summarize_localization_review.py init_localization_corrections.py apply_localization_corrections.py`
+  - inspected current `corrections.csv` and found existing `manual_corrected` rows still match auto-labels from the earlier buggy run
+- Outcome:
+  - click selections are no longer reloaded away during redraw
+  - `--review-status manual_corrected` can reopen only the affected rows
+- Next:
+  - rerun `python3 review_localization_interactive.py dataset_localization --review-status manual_corrected` and re-save corrected examples with the fixed reviewer
+
+### 2026-06-02 - First Reviewed Localization Subset Applied
+
+- Step: applied manual corrections for the real localization review subset
+- Files: `dataset_localization/metadata.csv`, `dataset_localization/samples/*.npz`, `dataset_localization/review/verified/*.png`, `dataset_localization/review/corrected/*.png`, `dataset_localization/review_subset/corrections.csv`, `AGENT_STATUS.md`, `AGENT_HANDOFF.md`
+- Validation:
+  - `python3 apply_localization_corrections.py dataset_localization`
+  - `python3 summarize_localization_review.py dataset_localization`
+  - `python3 -m py_compile review_localization_interactive.py summarize_localization_review.py init_localization_corrections.py apply_localization_corrections.py`
+  - metadata sanity check: `5840 threshold_auto`, `85 manual_corrected`, `75 manual_verified`
+- Outcome:
+  - `160/160` review subset rows are complete
+  - reviewed rows are balanced by channel: `80 ns`, `80 we`
+  - reviewed rows have `quality_flag=clean`
+  - `160` reviewed PNGs are materialized under `review/verified` and `review/corrected`
+- Next:
+  - commit the review tooling/status milestone, then implement a train/val/test split policy for reviewed localization samples by `source_file`
