@@ -134,6 +134,41 @@ dataset_localization/
 
 `manifest.csv` хранит `sample_id`, канал, bucket, причину отбора и ссылки на PNG/NPZ, чтобы удобно проводить ручной review по репрезентативной подвыборке.
 
+Создать шаблон ручных правок:
+
+```bash
+python3 init_localization_corrections.py dataset_localization/review_subset
+```
+
+Скрипт создаст `dataset_localization/review_subset/corrections.csv` с колонками:
+
+- `sample_id`
+- `auto_event_count`
+- `auto_event_times_s_json`
+- `review_status`
+- `corrected_event_times_s_json`
+- `quality_flag`
+- `comment`
+
+Рекомендуемые значения `review_status`:
+
+- `manual_verified` — auto-label принят как есть;
+- `manual_corrected` — времена/число событий вручную исправлены;
+- `artifact_suspected` — сегмент подозрителен и лучше не использовать для обучения;
+- `uncertain` — случай спорный, нужен отдельный разбор.
+
+После ручного заполнения применить правки к `metadata.csv` и `.npz`:
+
+```bash
+python3 apply_localization_corrections.py dataset_localization
+```
+
+После применения:
+
+- `metadata.csv` обновляет `event_count`, `event_times_s_json`, `label_source`, `quality_flag`;
+- соответствующие `.npz` обновляют `event_times_s`, `event_count`, `target_heatmap`;
+- review PNG копируются в `review/verified/<channel>/` или `review/corrected/<channel>/`.
+
 ### 1. Спектрограмма
 
 Показать спектрограмму для канала `ns`:
