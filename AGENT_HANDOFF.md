@@ -21,6 +21,7 @@ Implemented:
 - `build_localization_review_subset.py`
 - `init_localization_corrections.py`
 - `apply_localization_corrections.py`
+- `summarize_localization_review.py`
 
 Documented in:
 
@@ -43,6 +44,7 @@ Real outputs currently reported by the user:
 This means the next human-meaningful step is probably not another infra script, but:
 
 - reviewing and correcting `corrections.csv`
+- using `python3 summarize_localization_review.py dataset_localization` to track progress
 
 ## What To Check First
 
@@ -61,7 +63,6 @@ Good if the user wants to keep improving labels before training.
 
 Possible next code tasks:
 
-- helper to summarize correction progress
 - helper to export only `manual_verified` + `manual_corrected`
 - helper to mark train/val/test splits by `source_file`
 

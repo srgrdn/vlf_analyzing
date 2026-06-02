@@ -175,3 +175,17 @@ Add a new item under `Progress Log` with:
   - a ready-to-paste prompt exists for the next agent
 - Next:
   - use `corrections.csv` on the real `review_subset` and produce the first reviewed gold subset
+
+### 2026-06-02 - Review Progress Summary CLI
+
+- Step: implemented read-only review progress summary for localization corrections
+- Files: `summarize_localization_review.py`, `README.md`, `AGENT_STATUS.md`, `AGENT_HANDOFF.md`
+- Validation:
+  - `python3 -m py_compile summarize_localization_review.py init_localization_corrections.py apply_localization_corrections.py`
+  - `python3 summarize_localization_review.py --help`
+  - `python3 summarize_localization_review.py dataset_localization`
+- Outcome:
+  - current real subset reports `160` total rows, `0` reviewed, `160` pending
+  - CLI prints status/channel/bucket/quality summaries and next pending PNG paths
+- Next:
+  - fill `dataset_localization/review_subset/corrections.csv`, rerun the summary, then apply corrections when reviewed rows exist

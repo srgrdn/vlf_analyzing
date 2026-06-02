@@ -157,6 +157,14 @@ python3 init_localization_corrections.py dataset_localization/review_subset
 - `artifact_suspected` — сегмент подозрителен и лучше не использовать для обучения;
 - `uncertain` — случай спорный, нужен отдельный разбор.
 
+Проверить прогресс ручной разметки и увидеть следующие PNG для review:
+
+```bash
+python3 summarize_localization_review.py dataset_localization
+```
+
+Скрипт только читает `manifest.csv` и `corrections.csv`: печатает количество проверенных/ожидающих примеров, распределения по статусам, каналам и bucket, а также список следующих pending-сегментов.
+
 После ручного заполнения применить правки к `metadata.csv` и `.npz`:
 
 ```bash
