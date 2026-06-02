@@ -7,7 +7,7 @@
 - в папку `raw_data/` попадают минутные бинарные файлы;
 - `monitor_raw_data.py` постоянно следит за этой папкой;
 - как только файл перестает расти, монитор запускает `detect_broadband_bursts.py`;
-- если всплесков нет, файл можно удалить или перенести;
+- если всплесков нет, файл по умолчанию удаляется;
 - если всплески есть, файл сохраняется.
 
 ## Что лежит в репозитории
@@ -172,7 +172,7 @@ DETECTION_SUMMARY_JSON={"channel": "ns", "total_detections": 3, ...}
 - запускает `detect_broadband_bursts.py` два раза для каждого файла: по `ns` и по `we`;
 - читает JSON-сводку по каждому каналу;
 - пишет таблицу по каналам и сводную таблицу по минутным файлам;
-- при нуле детекций по обоим каналам удаляет файл или переносит его в `empty/`;
+- при нуле детекций по обоим каналам по умолчанию удаляет файл;
 - если детекции есть, переносит файл в `processing1/` и копирует в `processing2/`;
 - при ошибке переносит файл в `failed/`;
 - ведет лог и сохраняет состояние.
@@ -200,12 +200,13 @@ DETECTION_SUMMARY_JSON={"channel": "ns", "total_detections": 3, ...}
 - `raw_data/.monitor/monitor.log` — текстовый лог;
 - `reports/sferics_per_channel.csv` — одна строка на файл и канал;
 - `reports/sferics_summary.csv` — одна строка на минутный файл;
-- `empty/` — пустые файлы, если не указан `--delete-empty`;
 - `processing1/` — непустые файлы для пайплайна сфериков;
 - `processing2/` — копии непустых файлов для пайплайна вистлеров;
 - `failed/` — файлы, по которым детектор завершился с ошибкой.
 
-Каталоги `empty/`, `processing1/`, `processing2/`, `failed/` и `reports/` по умолчанию создаются рядом с `raw_data/`, то есть как соседние директории.
+Если нужен старый режим с сохранением пустых файлов, включи `--move-empty`: тогда дополнительно будет использоваться каталог `empty/`.
+
+Каталоги `processing1/`, `processing2/`, `failed/` и `reports/` по умолчанию создаются рядом с `raw_data/`, то есть как соседние директории. Каталог `empty/` создается только при `--move-empty`.
 
 ### Жизненный цикл файла
 
@@ -216,7 +217,7 @@ DETECTION_SUMMARY_JSON={"channel": "ns", "total_detections": 3, ...}
 3. Когда файл стабилен, монитор запускает детектор для `ns` и `we`.
 4. Детектор анализирует весь минутный файл в полосе `20-30 кГц`.
 5. Если по обоим каналам `TOTAL_DETECTIONS=0`:
-   файл удаляется или переносится в `empty/`.
+   файл по умолчанию удаляется.
 6. Если хотя бы по одному каналу детекции есть:
    файл переносится в `processing1/` и копируется в `processing2/`.
 7. Если детектор падает:
@@ -243,7 +244,7 @@ DETECTION_SUMMARY_JSON={"channel": "ns", "total_detections": 3, ...}
 
 - анализирует оба канала `ns` и `we`;
 - пишет CSV-отчеты в `reports/`;
-- переносит пустые файлы в `empty/`;
+- удаляет пустые файлы;
 - переносит непустые файлы в `processing1/`;
 - копирует непустые файлы в `processing2/`.
 
@@ -259,7 +260,7 @@ python3 monitor_raw_data.py \
   --mark-span 0.01
 ```
 
-### 2. Удалять файлы без всплесков
+### 2. Сохранять пустые файлы в `empty/`
 
 ```bash
 python3 monitor_raw_data.py \
@@ -271,10 +272,10 @@ python3 monitor_raw_data.py \
   --frequency-resolution 50 \
   --threshold-mad 8 \
   --mark-span 0.01 \
-  --delete-empty
+  --move-empty
 ```
 
-Этот режим уже удаляет файлы с нулем детекций. Для первых тестов лучше сначала не использовать его и поработать через `empty/`.
+Этот режим отключает дефолтное удаление и складывает пустые файлы в `empty/`.
 
 ### 3. Поменять директории для пайплайнов сфериков и вистлеров
 
@@ -296,7 +297,7 @@ python3 monitor_raw_data.py \
 
 - непустые файлы переедут в `D:/data/processing1`;
 - их копии появятся в `D:/data/processing2`;
-- пустые по-прежнему уйдут в `empty/`;
+- пустые по умолчанию будут удаляться;
 - ошибки уйдут в `failed/`.
 
 ### 4. Медленнее сканировать директорию
@@ -343,10 +344,10 @@ python3 monitor_raw_data.py \
 python monitor_raw_data.py --watch-dir raw_data --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01
 ```
 
-Если нужен режим с удалением пустых файлов:
+Если нужен режим с сохранением пустых файлов в `empty`:
 
 ```bat
-python monitor_raw_data.py --watch-dir raw_data --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01 --delete-empty
+python monitor_raw_data.py --watch-dir raw_data --freq-min 20000 --freq-max 30000 --segment-duration 60 --time-resolution 0.002 --frequency-resolution 50 --threshold-mad 8 --mark-span 0.01 --move-empty
 ```
 
 Пример простого `.bat`-файла:

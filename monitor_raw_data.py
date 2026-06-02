@@ -129,13 +129,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--delete-empty",
         action="store_true",
-        help="Delete files with zero detections. If not set, they are moved to --empty-dir.",
+        help="Deprecated compatibility flag. Empty files are deleted by default.",
+    )
+    parser.add_argument(
+        "--move-empty",
+        action="store_false",
+        dest="delete_empty",
+        help="Move files with zero detections to --empty-dir instead of deleting them.",
     )
     parser.add_argument(
         "--empty-dir",
         type=Path,
         default=None,
-        help="Directory for files with zero detections. Default: sibling ./empty unless --delete-empty is used.",
+        help="Directory for files with zero detections when --move-empty is used. Default: sibling ./empty",
     )
     parser.add_argument(
         "--processing1-dir",
@@ -160,6 +166,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Directory where files with detector errors are moved. Default: sibling ./failed",
     )
+    parser.set_defaults(delete_empty=True)
     return parser.parse_args()
 
 

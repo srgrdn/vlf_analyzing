@@ -1,0 +1,17 @@
+{
+  "files_total": 110,
+  "files_active": 82,
+  "files_empty": 28,
+  "detections_total": 4331,
+  "detections_ns": 196,
+  "detections_we": 4135,
+  "dominant_channel_counts": {
+    "we": 78,
+    "none": 28,
+    "ns": 4
+  },
+  "channel_share": {
+    "ns_fraction": 0.04525513738166705,
+    "we_fraction": 0.9547448626183329
+  }
+}

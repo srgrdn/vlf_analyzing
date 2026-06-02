@@ -1,0 +1,11 @@
+Total files           : 110
+Active files          : 82
+Empty files           : 28
+Total detections      : 4331
+Detections ns         : 196
+Detections we         : 4135
+Share ns              : 4.53%
+Share we              : 95.47%
+Dominant channels     : {'we': 78, 'none': 28, 'ns': 4}
+Per-channel rows      : 220
+Event rows            : 4331
