@@ -63,6 +63,51 @@ dataset/
 
 Для ручной разметки переносите PNG из `dataset/review/unlabeled` в `dataset/review/burst` или `dataset/review/no_burst`.
 
+### 0b. Localization dataset для 2D модели
+
+Собрать `2`-секундные сегменты со спектрограммами, auto-label временем сфериков и review PNG:
+
+```bash
+python3 build_localization_dataset.py raw_data \
+  --channel both \
+  --freq-min 20000 \
+  --freq-max 30000 \
+  --segment-duration 2 \
+  --time-resolution 0.002 \
+  --frequency-resolution 50 \
+  --overwrite
+```
+
+Скрипт создаёт структуру:
+
+```text
+dataset_localization/
+  samples/
+  review/
+    auto/
+      ns/
+      we/
+    verified/
+      ns/
+      we/
+    corrected/
+      ns/
+      we/
+  metadata.csv
+```
+
+В каждом `.npz` хранятся:
+
+- `spec_db`
+- `envelope_db`
+- `time_axis`
+- `freq_axis`
+- `event_times_s`
+- `event_count`
+- `target_heatmap`
+
+В `metadata.csv` сохраняются путь к исходному файлу, канал, границы сегмента, число auto-detected событий и JSON-список времен внутри сегмента.
+
 ### 1. Спектрограмма
 
 Показать спектрограмму для канала `ns`:
