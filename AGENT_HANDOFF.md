@@ -23,6 +23,7 @@ Implemented:
 - `apply_localization_corrections.py`
 - `summarize_localization_review.py`
 - `review_localization_interactive.py`
+- `split_localization_reviewed.py`
 
 Documented in:
 
@@ -46,7 +47,8 @@ Real outputs currently reported by the user:
 
 This means the review subset milestone is complete. The next human-meaningful step is:
 
-- implement train/val/test split policy for reviewed localization samples by `source_file`
+- run or inspect `split_localization_reviewed.py dataset_localization`
+- then start a training skeleton that uses only reviewed rows with non-empty `split`
 
 ## What To Check First
 
@@ -66,7 +68,6 @@ Mostly complete for the first subset.
 Possible next code tasks:
 
 - helper to export only `manual_verified` + `manual_corrected`
-- helper to mark train/val/test splits by `source_file`
 
 ### Option B: Training Skeleton
 

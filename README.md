@@ -204,6 +204,14 @@ python3 apply_localization_corrections.py dataset_localization
 - соответствующие `.npz` обновляют `event_times_s`, `event_count`, `target_heatmap`;
 - review PNG копируются в `review/verified/<channel>/` или `review/corrected/<channel>/`.
 
+Назначить `train`/`val`/`test` только для reviewed-сегментов:
+
+```bash
+python3 split_localization_reviewed.py dataset_localization
+```
+
+Скрипт группирует reviewed rows по `source_file`, чтобы сегменты из одного `.bin` не попадали одновременно в разные split. По умолчанию используются доли `70/15/15`; строки с `threshold_auto` остаются без split.
+
 ### 1. Спектрограмма
 
 Показать спектрограмму для канала `ns`:

@@ -13,14 +13,15 @@ Completed:
 1. Localization dataset builder
 2. Stratified review subset builder
 3. Manual correction workflow
+4. Interactive review workflow
+5. First reviewed subset
+6. Reviewed train/val/test split policy
 
 Not started yet:
 
-1. Reviewing and correcting a real subset into a gold set
-2. Train/val/test split policy implementation
-3. `2D CNN` training code
-4. Inference code for the future localization model
-5. Quantitative evaluation against reviewed labels
+1. `2D CNN` training code
+2. Inference code for the future localization model
+3. Quantitative evaluation against reviewed labels
 
 ## Current Data Snapshot
 
@@ -233,3 +234,19 @@ Add a new item under `Progress Log` with:
   - `160` reviewed PNGs are materialized under `review/verified` and `review/corrected`
 - Next:
   - commit the review tooling/status milestone, then implement a train/val/test split policy for reviewed localization samples by `source_file`
+
+### 2026-06-02 - Reviewed Split Policy
+
+- Step: implemented source-file grouped train/val/test split assignment for reviewed localization rows
+- Files: `split_localization_reviewed.py`, `README.md`, `AGENT_STATUS.md`, `AGENT_HANDOFF.md`
+- Validation:
+  - `python3 -m py_compile split_localization_reviewed.py review_localization_interactive.py summarize_localization_review.py init_localization_corrections.py apply_localization_corrections.py`
+  - `python3 split_localization_reviewed.py --help`
+  - `python3 split_localization_reviewed.py dataset_localization --dry-run`
+  - `python3 split_localization_reviewed.py dataset_localization`
+- Outcome:
+  - reviewed rows only are assigned `train`/`val`/`test`
+  - `threshold_auto` rows keep blank `split`
+  - all reviewed rows from the same `source_file` stay in the same split
+- Next:
+  - start `2D CNN -> temporal heatmap` training skeleton using only `manual_verified` and `manual_corrected` rows with non-empty split
