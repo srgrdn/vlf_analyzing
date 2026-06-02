@@ -108,6 +108,32 @@ dataset_localization/
 
 В `metadata.csv` сохраняются путь к исходному файлу, канал, границы сегмента, число auto-detected событий и JSON-список времен внутри сегмента.
 
+Собрать уменьшенный stratified subset для ручной проверки:
+
+```bash
+python3 build_localization_review_subset.py dataset_localization
+```
+
+По умолчанию скрипт создаёт:
+
+```text
+dataset_localization/
+  review_subset/
+    ns/
+      empty/
+      single/
+      few/
+      dense/
+    we/
+      empty/
+      single/
+      few/
+      dense/
+    manifest.csv
+```
+
+`manifest.csv` хранит `sample_id`, канал, bucket, причину отбора и ссылки на PNG/NPZ, чтобы удобно проводить ручной review по репрезентативной подвыборке.
+
 ### 1. Спектрограмма
 
 Показать спектрограмму для канала `ns`:
