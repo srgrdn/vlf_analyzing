@@ -41,6 +41,28 @@
 
 ## Быстрый старт
 
+### 0. Подготовка датасета
+
+Сгенерировать PNG для ручной разметки и `.npz` для будущего обучения:
+
+```bash
+python3 build_burst_dataset.py raw_data --overwrite
+```
+
+Скрипт создаёт структуру:
+
+```text
+dataset/
+  review/
+    unlabeled/
+    burst/
+    no_burst/
+  samples/
+  metadata.csv
+```
+
+Для ручной разметки переносите PNG из `dataset/review/unlabeled` в `dataset/review/burst` или `dataset/review/no_burst`.
+
 ### 1. Спектрограмма
 
 Показать спектрограмму для канала `ns`:

@@ -50,8 +50,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--channels", type=int, default=2, help="Number of interleaved channels.")
     parser.add_argument("--channel", choices=sorted(CHANNEL_NAME_TO_INDEX), default="ns", help="Human-readable channel selector.")
     parser.add_argument("--channel-index", type=int, default=None, help="Zero-based channel index override.")
-    parser.add_argument("--freq-min", type=float, required=True, help="Lower frequency bound in Hz.")
-    parser.add_argument("--freq-max", type=float, required=True, help="Upper frequency bound in Hz.")
+    parser.add_argument("--freq-min", type=float, default=None, help="Lower frequency bound in Hz. Default: 0")
+    parser.add_argument("--freq-max", type=float, default=None, help="Upper frequency bound in Hz. Default: Nyquist")
     parser.add_argument(
         "--segment-duration",
         type=float,

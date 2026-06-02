@@ -2,3 +2,11 @@
 *.bin
 *.csv
 *.pyc
+__pycache__/
+*.venv
+.venv-win
+*.npz
+*.bak
+*.json
+*.joblib
+*.pt
