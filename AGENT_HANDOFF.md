@@ -63,6 +63,7 @@ Generated diagnostic artifacts:
 - `reports/basic_signal_processing/Broadband_Data_2026.06.02_13.51.00/`
 - `full_result/` - full 2D CNN inference/statistics over all `raw_vlf_data` files (`220` files, `13200` segments, `50140` predicted events)
 - `docs/dataset_reproducibility/dataset_localization_snapshot_2026-06-22/` - lightweight metadata snapshot kept before deleting the heavy generated dataset
+- `docs/dataset_reproducibility/raw_data_snapshot_2026-06-22/` - lightweight manifest kept before deleting root-level raw input data
 
 ## Important Real-World State
 
@@ -80,6 +81,12 @@ Important cleanup state:
 - final reviewed split before deletion: `415 train`, `70 val`, `75 test`
 - preserved files include final `metadata.csv`, pre-review/pre-split metadata backups, first review subset manifest/corrections, and v2 manifest/corrections
 - scripts and documentation remain available so the dataset can be regenerated from new raw data
+- root-level raw input directories were also deleted on 2026-06-22 to free disk space:
+  - `raw_vlf_data/`
+  - `raw_data/`
+  - `new_test_raw_data/`
+- before deletion, a `323`-file manifest was saved under `docs/dataset_reproducibility/raw_data_snapshot_2026-06-22/`
+- restore compatible raw files under the same directory names before rerunning raw waveform workflows
 
 This means the old review subset milestone was complete, but the generated dataset artifacts are no longer present. The next human-meaningful step after loading new raw data is:
 

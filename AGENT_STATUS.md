@@ -589,3 +589,22 @@ Add a new item under `Progress Log` with:
   - code, reports, docs, trained model artifacts, and raw data were not deleted
 - Next:
   - when new raw data is available, regenerate `dataset_localization` using the documented commands and then redo review/split/training as needed
+
+### 2026-06-22 - Raw Data Cleanup With Reproducibility Manifest
+
+- Step: removed root-level raw data directories while preserving a lightweight manifest for later restoration/reproduction
+- Files: `docs/dataset_reproducibility/raw_data_snapshot_2026-06-22/README.md`, `docs/dataset_reproducibility/raw_data_snapshot_2026-06-22/raw_data_manifest.csv`, `AGENT_STATUS.md`, `AGENT_HANDOFF.md`
+- Validation:
+  - created a manifest for `323` raw files before deletion
+  - verified `raw_vlf_data/`, `raw_data/`, and `new_test_raw_data/` no longer exist
+  - recalculated project size after cleanup
+- Outcome:
+  - removed approximately `5.4G` of raw input data
+  - preserved counts before cleanup:
+    - `raw_vlf_data`: `233` files, about `5.1G`
+    - `raw_data`: `18` files, about `43M`
+    - `new_test_raw_data`: `72` files, about `273M`
+  - project size dropped to about `5.7G`
+  - remaining largest item is `.venv/` at about `5.1G`
+- Next:
+  - restore compatible raw files under the same root-level directory names before rerunning raw inference, signal-processing plots, dataset generation, or azimuth estimation from waveforms
