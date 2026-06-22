@@ -1,0 +1,49 @@
+{
+  "model_path": "/home/s_grudinin/code/university/vlf_analyzing/worktrees/2d_localization/methods/2d_cnn_localization/models/sferics_localization_2d.pt",
+  "device": "cpu",
+  "input_files": [
+    "/home/s_grudinin/code/university/vlf_analyzing/new_test_raw_data/Broadband_Data_2026.06.02_13.51.00.bin"
+  ],
+  "channels": [
+    "ns",
+    "we"
+  ],
+  "segment_duration": 60.0,
+  "freq_min": 0.0,
+  "freq_max": 30000.0,
+  "time_resolution": 0.002,
+  "frequency_resolution": 50.0,
+  "peak_threshold": 0.28,
+  "min_peak_distance": 0.03,
+  "files": 1,
+  "segments": 2,
+  "total_predicted_events": 610,
+  "by_channel": {
+    "ns": {
+      "segments": 1,
+      "total_predicted_events": 156,
+      "mean_predicted_events": 156.0,
+      "max_predicted_events": 156
+    },
+    "we": {
+      "segments": 1,
+      "total_predicted_events": 454,
+      "mean_predicted_events": 454.0,
+      "max_predicted_events": 454
+    }
+  },
+  "by_file_channel": {
+    "Broadband_Data_2026.06.02_13.51.00.bin:ns": {
+      "segments": 1,
+      "total_predicted_events": 156,
+      "mean_predicted_events": 156.0,
+      "max_predicted_events": 156
+    },
+    "Broadband_Data_2026.06.02_13.51.00.bin:we": {
+      "segments": 1,
+      "total_predicted_events": 454,
+      "mean_predicted_events": 454.0,
+      "max_predicted_events": 454
+    }
+  }
+}

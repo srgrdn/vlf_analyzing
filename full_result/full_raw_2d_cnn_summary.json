@@ -1,0 +1,47 @@
+{
+  "input_root": "/home/s_grudinin/code/university/vlf_analyzing/raw_vlf_data",
+  "input_files": 220,
+  "segments": 13200,
+  "channels": [
+    "ns",
+    "we"
+  ],
+  "segment_duration_s": 2.0,
+  "freq_min_hz": 20000.0,
+  "freq_max_hz": 30000.0,
+  "peak_threshold": 0.35,
+  "min_peak_distance_s": 0.03,
+  "total_events": 50140,
+  "by_channel": {
+    "ns": {
+      "segments": 6600,
+      "events": 29237,
+      "mean_events_per_segment": 4.429848484848485,
+      "median_events_per_segment": 4.0,
+      "max_events_per_segment": 16,
+      "events_per_minute": 132.89545454545456
+    },
+    "we": {
+      "segments": 6600,
+      "events": 20903,
+      "mean_events_per_segment": 3.167121212121212,
+      "median_events_per_segment": 2.0,
+      "max_events_per_segment": 23,
+      "events_per_minute": 95.01363636363637
+    }
+  },
+  "by_time_of_day": {
+    "before_noon": {
+      "segments": 0,
+      "events": 0,
+      "mean_events_per_segment": 0.0,
+      "events_per_minute": 0.0
+    },
+    "after_noon": {
+      "segments": 13200,
+      "events": 50140,
+      "mean_events_per_segment": 3.7984848484848484,
+      "events_per_minute": 113.95454545454545
+    }
+  }
+}

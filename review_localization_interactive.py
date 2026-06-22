@@ -29,6 +29,12 @@ def parse_args() -> argparse.Namespace:
         help="Path to corrections.csv. Default: <dataset_dir>/review_subset/corrections.csv",
     )
     parser.add_argument(
+        "--review-subset-dir",
+        type=Path,
+        default=None,
+        help="Path to review subset directory. Default: <dataset_dir>/review_subset, or parent of --corrections.",
+    )
+    parser.add_argument(
         "--start-sample-id",
         default=None,
         help="Start from this sample_id if it is present in corrections.csv.",
@@ -332,13 +338,18 @@ def validate_manifest_links(manifest_rows: list[dict[str, str]], correction_rows
 def main() -> None:
     args = parse_args()
     dataset_dir = args.dataset_dir.expanduser().resolve()
-    review_subset_dir = dataset_dir / "review_subset"
-    manifest_path = review_subset_dir / "manifest.csv"
     corrections_path = (
         args.corrections.expanduser().resolve()
         if args.corrections
-        else review_subset_dir / "corrections.csv"
+        else None
     )
+    review_subset_dir = (
+        args.review_subset_dir.expanduser().resolve()
+        if args.review_subset_dir
+        else (corrections_path.parent if corrections_path else dataset_dir / "review_subset")
+    )
+    corrections_path = corrections_path or review_subset_dir / "corrections.csv"
+    manifest_path = review_subset_dir / "manifest.csv"
 
     manifest_rows, _ = read_csv_rows(manifest_path)
     correction_rows, fieldnames = read_csv_rows(corrections_path)

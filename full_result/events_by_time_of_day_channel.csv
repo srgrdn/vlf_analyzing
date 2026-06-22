@@ -1,0 +1,3 @@
+time_of_day,channel,segments,events,events_per_minute
+after_noon,ns,6600,29237,132.89545454545456
+after_noon,we,6600,20903,95.01363636363637

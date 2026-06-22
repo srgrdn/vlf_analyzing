@@ -1,0 +1,17 @@
+{
+  "events_processed": 296,
+  "reliable_events": 4,
+  "quality_counts": {
+    "good": 4,
+    "low_snr": 54,
+    "low_snr;single_channel_detection": 208,
+    "low_snr;weak_linearity": 2,
+    "low_snr;weak_linearity;single_channel_detection": 1,
+    "weak_linearity": 5,
+    "weak_linearity;single_channel_detection": 22
+  },
+  "peak_bin_start_deg": 50.0,
+  "peak_bin_end_deg": 60.0,
+  "peak_bin_count": 2,
+  "mean_arrival_axis_deg": 63.08491674264452
+}

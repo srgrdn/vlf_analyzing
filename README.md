@@ -2,6 +2,42 @@
 
 Набор утилит для разбора и визуализации бинарных записей `Broadband_Data_*.bin`, построения спектрограмм и осциллограмм, детектирования всплесков в выбранной полосе, а также прогона изображений через готовую модель классификации вистлеров.
 
+Подробное описание базовой обработки сигналов без нейросети:
+
+```text
+docs/BASIC_SIGNAL_PROCESSING_RU.md
+```
+
+Подробное описание порогового детектора:
+
+```text
+docs/THRESHOLD_DETECTOR_RU.md
+```
+
+Подробное описание подготовки и разметки обучающего датасета:
+
+```text
+docs/TRAINING_DATASET_PREPARATION_RU.md
+```
+
+Подробное описание обнаружения событий моделью 2D CNN локализации:
+
+```text
+docs/2D_CNN_EVENT_DETECTION_RU.md
+```
+
+Подробное описание метрик и оценки качества методов:
+
+```text
+docs/METRICS_AND_QUALITY_EVALUATION_RU.md
+```
+
+Раздел с результатами оценки моделей:
+
+```text
+docs/MODEL_EVALUATION_RESULTS_RU.md
+```
+
 ## Что лежит в папке
 
 - `Broadband_Data_2026.03.25_16.31.00.bin` — пример исходного бинарного файла.
@@ -211,6 +247,117 @@ python3 split_localization_reviewed.py dataset_localization
 ```
 
 Скрипт группирует reviewed rows по `source_file`, чтобы сегменты из одного `.bin` не попадали одновременно в разные split. По умолчанию используются доли `70/15/15`; строки с `threshold_auto` остаются без split.
+
+Собрать второй, более полезный subset для active review после первого обучения:
+
+```bash
+python3 build_localization_active_review_subset.py dataset_localization --overwrite
+python3 init_localization_corrections.py dataset_localization/review_subset_v2
+python3 summarize_localization_review.py dataset_localization --review-subset-dir dataset_localization/review_subset_v2
+```
+
+Обучить/переобучить 2D localization модель и затем прогнать её по новому raw-файлу удобнее всего в ноутбуке:
+
+```bash
+jupyter notebook methods/2d_cnn_localization/train_sferics_localization_2d.ipynb
+```
+
+Важные секции ноутбука:
+
+- `Train` — обучает CNN и сохраняет лучший checkpoint в `methods/2d_cnn_localization/models/sferics_localization_2d.pt`;
+- `Peak Threshold Sweep` — подбирает post-processing threshold по validation/test метрикам;
+- `Saved Model Checkpoint` — загружает сохраненную модель без переобучения;
+- `Run Saved Model On New Raw File` — режет `new_test_raw_data/Broadband_Data_2026.06.02_13.51.00.bin` на 2-секундные окна `20-30 kHz`, прогоняет `ns`/`we` через модель и пишет CSV предсказанных времен в `methods/2d_cnn_localization/reports/`;
+- `Plot Raw File Predictions` — показывает спектрограммы и предсказанную heatmap по самым активным сегментам.
+
+Для повторяемого инференса без ноутбука:
+
+```bash
+python3 methods/2d_cnn_localization/run_sferics_localization_2d.py \
+  /home/s_grudinin/code/university/vlf_analyzing/new_test_raw_data \
+  --channel both
+```
+
+Сохранить диагностические PNG для самых активных сегментов:
+
+```bash
+python3 methods/2d_cnn_localization/run_sferics_localization_2d.py \
+  /home/s_grudinin/code/university/vlf_analyzing/new_test_raw_data \
+  --channel both \
+  --save-plots \
+  --plot-top 6
+```
+
+Интерактивно верифицировать предсказания модели на новом raw-наборе:
+
+```bash
+python3 methods/2d_cnn_localization/verify_sferics_localization_2d_interactive.py \
+  /home/s_grudinin/code/university/vlf_analyzing/new_test_raw_data \
+  --channel both
+```
+
+На графике белые линии — времена модели, красные линии — твоя ручная проверка/исправление. Горячие клавиши:
+
+- `v` — модель сработала правильно;
+- `enter` или `c` — сохранить красные клики как исправленную разметку;
+- `f` — модель дала false positive, исправленный список событий пустой;
+- `m` — модель пропустила события, сохранить красные клики как истинные события;
+- `backspace` — удалить последний клик;
+- `r` — вернуть времена модели;
+- `x` — очистить клики;
+- `a` — артефактный сегмент;
+- `u` — спорный сегмент;
+- `s` — пропустить;
+- `q` — выйти.
+
+После верификации собрать метрики и графики:
+
+```bash
+python3 methods/2d_cnn_localization/summarize_sferics_localization_verification.py \
+  --save-plots
+```
+
+`build_localization_active_review_subset.py` исключает уже reviewed rows и выбирает unreviewed сегменты с приоритетом:
+
+- `source_file/channel`, где текущая модель ошибалась в val/test predictions;
+- `we` channel как более шумный;
+- `few`/`dense` сегменты как более сложные;
+- часть `empty`/`single` для контроля false positives и общей coverage.
+
+Разметить `review_subset_v2` интерактивно:
+
+```bash
+python3 review_localization_interactive.py dataset_localization \
+  --review-subset-dir dataset_localization/review_subset_v2
+```
+
+После разметки:
+
+```bash
+python3 apply_localization_corrections.py dataset_localization \
+  --corrections dataset_localization/review_subset_v2/corrections.csv \
+  --dry-run
+
+python3 apply_localization_corrections.py dataset_localization \
+  --corrections dataset_localization/review_subset_v2/corrections.csv
+
+python3 split_localization_reviewed.py dataset_localization
+```
+
+Обучить первый baseline `2D CNN -> temporal heatmap` на reviewed split в notebook:
+
+```bash
+jupyter notebook methods/2d_cnn_localization/train_sferics_localization_2d.ipynb
+```
+
+CLI-вариант для batch run:
+
+```bash
+python3 methods/2d_cnn_localization/train_sferics_localization_2d.py \
+  --dataset-dir dataset_localization
+```
+
+Скрипт использует только строки `manual_verified` и `manual_corrected` с `quality_flag=clean` и непустым `split`. Выход модели — временная heatmap той же длины, что `target_heatmap`; CSV с предсказаниями также содержит простой peak-picking preview для будущей оценки event times/count.
 
 ### 1. Спектрограмма
 
